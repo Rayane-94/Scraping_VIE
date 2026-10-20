@@ -1,52 +1,116 @@
 # vie-watcher
 
-Surveille les offres VIE de [mon-vie-via.businessfrance.fr](https://mon-vie-via.businessfrance.fr) et envoie les nouvelles offres pertinentes sur Telegram (ou ntfy.sh), via GitHub Actions 3 fois par jour (6h, 12h, 18h UTC). Aucun PC allumé nécessaire.
+Bot qui surveille les offres VIE de [mon-vie-via.businessfrance.fr](https://mon-vie-via.businessfrance.fr) et envoie sur Telegram les nouvelles offres qui correspondent à un profil.
+
+Le profil est entièrement réglable : métier, mots-clés, pays, technos. Il est configuré ici pour du développement full stack, mais il peut servir pour n'importe quel métier (finance, marketing, ingénierie…) en modifiant `config.json`.
+
+Le bot tourne sur **GitHub Actions**, le service de GitHub qui exécute du code sur ses propres serveurs. Il se lance tout seul 3 fois par jour (6h, 12h, 18h UTC) : pas besoin de serveur ni de PC allumé.
+
+## Installer son propre bot
+
+### 1. Récupérer le projet
+
+Créer un repo vide sur GitHub (sans README), puis :
+
+```bash
+git clone https://github.com/Rayane-94/Scraping_VIE.git vie-watcher
+cd vie-watcher
+git rm seen.json
+git commit -m "Reset seen.json"
+git remote set-url origin https://github.com/<ton-pseudo>/<ton-repo>.git
+git push -u origin main
+```
+
+`seen.json` est la mémoire du bot (voir [Fonctionnement](#fonctionnement)). Celui du repo d'origine contient les offres déjà envoyées à son propriétaire : si on le garde, ces offres ne seront jamais envoyées. Il suffit de le supprimer, le bot le recrée tout seul au premier lancement.
+
+### 2. Créer le bot Telegram
+
+1. Sur Telegram, ouvrir [@BotFather](https://t.me/BotFather) et envoyer `/newbot`.
+2. Choisir un nom, puis un identifiant qui finit par `bot`.
+3. BotFather renvoie un token (`123456789:AAH...`).
+4. Ouvrir la conversation avec **son** bot (lien `t.me/...` donné par BotFather), appuyer sur **Démarrer** et envoyer un message.
+5. Aller sur `https://api.telegram.org/bot<TOKEN>/getUpdates` et récupérer le nombre dans `"chat":{"id": ...}`.
+
+Si `getUpdates` renvoie `"result":[]`, c'est que le message a été envoyé à BotFather et pas au bot.
+
+### 3. Ajouter les secrets
+
+Dans le repo GitHub : **Settings › Secrets and variables › Actions › New repository secret**
+
+| Secret | Valeur |
+|---|---|
+| `TELEGRAM_TOKEN` | le token donné par BotFather |
+| `TELEGRAM_CHAT` | le chat id récupéré à l'étape précédente |
+
+### 4. Adapter `config.json` à son métier
+
+C'est le seul fichier à modifier pour changer le type d'offres reçues. Les filtres portent sur le **titre** de l'offre, sans tenir compte des majuscules ni des accents (écrire `developpeur`, pas `développeur`).
+
+| Clé | Rôle | Exemple |
+|---|---|---|
+| `include` | le titre doit contenir au moins un de ces mots | `"developpeu(r\|se)"`, `"devops"` |
+| `exclude` | les titres à écarter | `"business develop"`, `"sales"` |
+| `countries` | pays ciblés, `[]` pour tous | `["CA", "belgique"]` |
+| `highlight` | technos ou compétences recherchées dans la description, affichées dans le message | `"react"`, `"php"` |
+
+Exemple pour un profil contrôle de gestion :
+
+```json
+"include": ["controle(ur|use)? de gestion", "financial controller", "\\bfp&a\\b"],
+"exclude": ["stage"],
+"highlight": ["excel", "sap", "power ?bi"]
+```
+
+Pour vérifier la liste des offres retenues sans rien envoyer :
+
+```bash
+node check.mjs --dry-run
+```
+
+Une fois satisfait, commiter et pousser `config.json`.
+
+### 5. Lancer le bot
+
+Sur GitHub, onglet **Actions** › **vie-watcher** › **Run workflow**.
+
+Ce premier lancement manuel envoie toutes les offres qui correspondent au profil. Ensuite, le bot tourne tout seul 3 fois par jour et n'envoie que les nouvelles offres.
+
+Pour changer les horaires, modifier la ligne `cron` dans `.github/workflows/vie.yml` (en heure UTC).
 
 ## Fonctionnement
 
-`check.mjs` (Node 22, zéro dépendance) :
+À chaque lancement, `check.mjs` :
 
-1. Lit la clé `X-API-KEY` publique dans la page d'accueil du site (elle peut changer, on la relit à chaque run).
-2. Récupère **toutes** les offres via l'API JSON du site (`POST /api/Offers/search`, pages de 100, avec timeout et 3 tentatives).
-3. Filtre sur le **titre** avec `config.json`.
-4. Notifie les offres absentes de `seen.json`, en indiquant les technos du profil citées dans l'annonce.
-5. Écrit `seen.json` (seulement les offres réellement notifiées). Le workflow le commite.
+1. récupère toutes les offres publiées sur le site ;
+2. garde celles qui correspondent à `config.json` ;
+3. envoie sur Telegram celles qui ne sont pas encore dans `seen.json` ;
+4. ajoute les offres envoyées dans `seen.json`.
 
-Garde-fous : rien n'est écrit si l'API échoue, renvoie 0 offre ou une pagination incomplète. Une notif qui échoue sera retentée au run suivant.
+### seen.json
 
-## config.json
+C'est la mémoire du bot : la liste des offres déjà envoyées, pour ne pas recevoir deux fois la même.
 
-Les regex sont insensibles à la casse et aux accents : écrire `developpeur`, pas `développeur`.
+GitHub Actions repart d'une machine vierge à chaque lancement : un fichier modifié pendant l'exécution est perdu à la fin. Le workflow commite donc `seen.json` dans le repo après chaque passage, pour que le lancement suivant le retrouve. Les commits `chore: maj seen.json` dans l'historique viennent de là.
 
-| Clé | Rôle |
+Il n'y a rien à faire dessus : ni le créer, ni le modifier. Le supprimer revient à tout renvoyer au prochain lancement.
+
+Si l'API ne répond pas ou renvoie une liste vide, rien n'est envoyé ni modifié. Une offre dont l'envoi a échoué n'est pas ajoutée à `seen.json` et sera renvoyée au passage suivant.
+
+## Notifications avec ntfy (alternative à Telegram)
+
+[ntfy.sh](https://ntfy.sh) envoie des notifications sur l'application mobile ntfy, sans créer de bot. Il suffit d'ajouter un secret `NTFY_TOPIC` (un nom difficile à deviner) et de s'abonner à ce topic dans l'application.
+
+L'usage de base est gratuit. ntfy propose aussi une offre payante (ntfy Pro) pour réserver son nom de topic et relever les limites d'envoi. Attention : un topic gratuit est public, toute personne qui connaît son nom peut lire les messages.
+
+## Stack
+
+| Élément | Utilisation |
 |---|---|
-| `include` | le titre doit matcher au moins une regex |
-| `exclude` | le titre ne doit en matcher aucune (sales, business developer…) |
-| `countries` | vide = tous les pays ; sinon codes (`"BE"`, `"CA"`) ou noms (`"belgique"`) |
-| `highlight` | technos recherchées dans la description, affichées dans la notif |
-
-## Installation
-
-1. Pousser ce repo sur GitHub. Il peut être public : aucune valeur sensible n'est dans le code, tout passe par les secrets.
-2. Choisir un canal (un ou plusieurs) et ajouter ses secrets dans *Settings › Secrets and variables › Actions* :
-
-| Canal | Secrets | Obtention |
-|---|---|---|
-| Telegram | `TELEGRAM_TOKEN`, `TELEGRAM_CHAT` | [@BotFather](https://t.me/BotFather) › `/newbot` pour le token ; écrire au bot puis lire `chat.id` sur `https://api.telegram.org/bot<TOKEN>/getUpdates` |
-| ntfy.sh | `NTFY_TOPIC` | un nom de topic difficile à deviner, à suivre dans l'app ntfy |
-
-3. *Actions › vie-watcher › Run workflow* pour un premier test.
-
-Le premier run envoie toutes les offres pertinentes du moment, une par message (environ 1 par seconde).
-
-## En local
-
-```bash
-node check.mjs --dry-run          # affiche les nouvelles offres, n'envoie rien, n'écrit rien
-TELEGRAM_TOKEN=... TELEGRAM_CHAT=... node check.mjs
-```
-
-## À savoir
-
-- GitHub désactive les crons d'un repo sans activité pendant 60 jours. Les commits de `seen.json` comptent, mais sans nouvelle offre pendant 2 mois il faudra réactiver le workflow.
-- Les entrées de `seen.json` de plus de 180 jours sont purgées.
+| **Node.js 22** | exécution du script (modules ESM, `fetch` natif) | |
+| **GitHub Actions** | exécution planifiée (`cron`) sur `ubuntu-latest`, avec `actions/checkout@v4` et `actions/setup-node@v4` |
+| **GitHub Secrets** | stockage du token et du chat id Telegram |
+| **Git** | sauvegarde de `seen.json` par un commit automatique |
+| **API Business France** | source des offres (`civiweb-api-prd.azurewebsites.net/api/Offers/search`), la même que celle utilisée par le site |
+| **Telegram Bot API** | envoi des messages (`sendMessage`, mise en forme HTML) |
+| **ntfy.sh** | canal de notification optionnel |
+| **JSON** | configuration (`config.json`) et mémoire (`seen.json`) |
