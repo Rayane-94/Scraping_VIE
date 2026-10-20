@@ -37,7 +37,7 @@ Les regex sont insensibles à la casse et aux accents : écrire `developpeur`, p
 
 3. *Actions › vie-watcher › Run workflow* pour un premier test.
 
-Le premier run envoie toutes les offres pertinentes du moment (25 messages max, puis un récapitulatif).
+Le premier run envoie toutes les offres pertinentes du moment, une par message (environ 1 par seconde).
 
 ## En local
 
