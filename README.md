@@ -27,7 +27,7 @@ Les regex sont insensibles à la casse et aux accents : écrire `developpeur`, p
 
 ## Installation
 
-1. Pousser ce repo sur GitHub (repo **privé**).
+1. Pousser ce repo sur GitHub. Il peut être public : aucune valeur sensible n'est dans le code, tout passe par les secrets.
 2. Créer un bot Telegram : écrire à [@BotFather](https://t.me/BotFather), `/newbot`, récupérer le token.
 3. Envoyer un message au bot, puis ouvrir `https://api.telegram.org/bot<TOKEN>/getUpdates` pour lire `chat.id`.
 4. Dans le repo : *Settings › Secrets and variables › Actions*, ajouter `TG_TOKEN` et `TG_CHAT`.

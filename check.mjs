@@ -37,7 +37,9 @@ async function fetchRetry(url, options = {}, { retries = 3, timeout = 30_000 } =
     if (res?.ok) return res;
     if (res) {
       const body = await res.text().catch(() => '');
-      lastErr = new Error(`HTTP ${res.status} sur ${url.replace(/bot[^/]+/, 'bot***')} ${body.slice(0, 200)}`);
+      // les logs Actions d'un repo public sont visibles : on masque token et topic
+      const safeUrl = url.replace(/\/bot[^/]+/, '/bot***').replace(/ntfy\.sh\/.+/, 'ntfy.sh/***');
+      lastErr = new Error(`HTTP ${res.status} sur ${safeUrl} ${body.slice(0, 200)}`);
       if (res.status < 500 && res.status !== 429) break; // 4xx : inutile de réessayer
     }
     if (attempt < retries) await sleep(2 ** attempt * 1000);
