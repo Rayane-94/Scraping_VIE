@@ -12,7 +12,7 @@ const SEEN_FILE = new URL('./seen.json', import.meta.url);
 const CONFIG_FILE = new URL('./config.json', import.meta.url);
 
 const DRY_RUN = process.argv.includes('--dry-run');
-const { TG_TOKEN, TG_CHAT, NTFY_TOPIC, VIE_API_KEY } = process.env;
+const { TELEGRAM_TOKEN, TELEGRAM_CHAT, NTFY_TOPIC, VIE_API_KEY } = process.env;
 
 // ---------- utilitaires ----------
 
@@ -119,10 +119,10 @@ function formatOffer(o, tags) {
 }
 
 async function sendTelegram(html) {
-  await fetchRetry(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, {
+  await fetchRetry(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: TG_CHAT, text: html, parse_mode: 'HTML', disable_web_page_preview: true }),
+    body: JSON.stringify({ chat_id: TELEGRAM_CHAT, text: html, parse_mode: 'HTML', disable_web_page_preview: true }),
   });
 }
 
@@ -137,7 +137,7 @@ async function sendNtfy(html, url) {
 }
 
 async function notify(html, url) {
-  if (TG_TOKEN && TG_CHAT) await sendTelegram(html);
+  if (TELEGRAM_TOKEN && TELEGRAM_CHAT) await sendTelegram(html);
   if (NTFY_TOPIC) await sendNtfy(html, url);
 }
 
@@ -162,8 +162,8 @@ async function saveSeen(seen) {
 
 async function main() {
   const config = JSON.parse(await readFile(CONFIG_FILE, 'utf8'));
-  if (!DRY_RUN && !(TG_TOKEN && TG_CHAT) && !NTFY_TOPIC) {
-    throw new Error('Aucun canal de notif : définir TG_TOKEN + TG_CHAT ou NTFY_TOPIC (ou lancer avec --dry-run)');
+  if (!DRY_RUN && !(TELEGRAM_TOKEN && TELEGRAM_CHAT) && !NTFY_TOPIC) {
+    throw new Error('Aucun canal de notif : définir TELEGRAM_TOKEN + TELEGRAM_CHAT ou NTFY_TOPIC (ou lancer avec --dry-run)');
   }
 
   const seen = await loadSeen();

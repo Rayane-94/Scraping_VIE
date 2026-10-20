@@ -32,8 +32,9 @@ Les regex sont insensibles à la casse et aux accents : écrire `developpeur`, p
 
 | Canal | Secrets | Obtention |
 |---|---|---|
-| Telegram | `TG_TOKEN`, `TG_CHAT` | [@BotFather](https://t.me/BotFather) › `/newbot` pour le token ; écrire au bot puis lire `chat.id` sur `https://api.telegram.org/bot<TOKEN>/getUpdates` |
+| Telegram | `TELEGRAM_TOKEN`, `TELEGRAM_CHAT` | [@BotFather](https://t.me/BotFather) › `/newbot` pour le token ; écrire au bot puis lire `chat.id` sur `https://api.telegram.org/bot<TOKEN>/getUpdates` |
 | ntfy.sh | `NTFY_TOPIC` | un nom de topic difficile à deviner, à suivre dans l'app ntfy |
+
 3. *Actions › vie-watcher › Run workflow* pour un premier test.
 
 Le premier run envoie toutes les offres pertinentes du moment (25 messages max, puis un récapitulatif).
@@ -42,7 +43,7 @@ Le premier run envoie toutes les offres pertinentes du moment (25 messages max, 
 
 ```bash
 node check.mjs --dry-run          # affiche les nouvelles offres, n'envoie rien, n'écrit rien
-TG_TOKEN=... TG_CHAT=... node check.mjs
+TELEGRAM_TOKEN=... TELEGRAM_CHAT=... node check.mjs
 ```
 
 ## À savoir
