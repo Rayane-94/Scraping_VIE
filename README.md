@@ -28,11 +28,14 @@ Les regex sont insensibles à la casse et aux accents : écrire `developpeur`, p
 ## Installation
 
 1. Pousser ce repo sur GitHub. Il peut être public : aucune valeur sensible n'est dans le code, tout passe par les secrets.
-2. Créer un bot Telegram : écrire à [@BotFather](https://t.me/BotFather), `/newbot`, récupérer le token.
-3. Envoyer un message au bot, puis ouvrir `https://api.telegram.org/bot<TOKEN>/getUpdates` pour lire `chat.id`.
-4. Dans le repo : *Settings › Secrets and variables › Actions*, ajouter `TG_TOKEN` et `TG_CHAT`.
-   - Alternative : `NTFY_TOPIC` (un nom de topic difficile à deviner) et l'app ntfy sur le téléphone.
-5. *Actions › vie-watcher › Run workflow* pour un premier test.
+2. Choisir un canal (un ou plusieurs) et ajouter ses secrets dans *Settings › Secrets and variables › Actions* :
+
+| Canal | Secrets | Obtention |
+|---|---|---|
+| Telegram | `TELEGRAM_TOKEN`, `TELEGRAM_CHAT` | [@BotFather](https://t.me/BotFather) › `/newbot` pour le token ; écrire au bot puis lire `chat.id` sur `https://api.telegram.org/bot<TOKEN>/getUpdates` |
+| ntfy.sh | `NTFY_TOPIC` | un nom de topic difficile à deviner, à suivre dans l'app ntfy |
+
+3. *Actions › vie-watcher › Run workflow* pour un premier test.
 
 Le premier run envoie toutes les offres pertinentes du moment (25 messages max, puis un récapitulatif).
 
@@ -40,7 +43,7 @@ Le premier run envoie toutes les offres pertinentes du moment (25 messages max, 
 
 ```bash
 node check.mjs --dry-run          # affiche les nouvelles offres, n'envoie rien, n'écrit rien
-TG_TOKEN=... TG_CHAT=... node check.mjs
+TELEGRAM_TOKEN=... TELEGRAM_CHAT=... node check.mjs
 ```
 
 ## À savoir
