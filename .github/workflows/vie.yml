@@ -1,0 +1,42 @@
+name: vie-watcher
+
+on:
+  schedule:
+    - cron: '0 6,12,18 * * *' # UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: vie-watcher
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Vérifier les nouvelles offres
+        run: node check.mjs
+        env:
+          TG_TOKEN: ${{ secrets.TG_TOKEN }}
+          TG_CHAT: ${{ secrets.TG_CHAT }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+
+      # always() : si une notif échoue en cours de route, on garde celles déjà envoyées
+      - name: Commit seen.json
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add seen.json 2>/dev/null || exit 0
+          git diff --cached --quiet && exit 0
+          git commit -m "chore: maj seen.json"
+          git push
