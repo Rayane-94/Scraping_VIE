@@ -28,8 +28,7 @@ jobs:
         env:
           TG_TOKEN: ${{ secrets.TG_TOKEN }}
           TG_CHAT: ${{ secrets.TG_CHAT }}
-          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
-          VIE_API_KEY: ${{ secrets.VIE_API_KEY }} # optionnel : sinon lue sur le site
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}          VIE_API_KEY: ${{ secrets.VIE_API_KEY }} # optionnel : sinon lue sur le site
 
       # always() : si une notif échoue en cours de route, on garde celles déjà envoyées
       - name: Commit seen.json
