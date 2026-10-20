@@ -40,4 +40,5 @@ jobs:
           git add seen.json 2>/dev/null || exit 0
           git diff --cached --quiet && exit 0
           git commit -m "chore: maj seen.json"
+          git pull --rebase origin "${GITHUB_REF_NAME}"
           git push

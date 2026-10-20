@@ -20,10 +20,12 @@ const [TELEGRAM_TOKEN, TELEGRAM_CHAT, NTFY_TOPIC, VIE_API_KEY] =
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// minuscules + sans accents, pour des regex simples dans config.json
-const norm = (s) => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+// sans accents, pour des regex simples dans config.json
+const stripAccents = (s) => String(s ?? '').normalize('NFD').replace(/\p{M}/gu, '');
+const norm = (s) => stripAccents(s).toLowerCase();
 
-const compile = (list = []) => list.map((p) => new RegExp(norm(p), 'i'));
+// pas de toLowerCase sur les motifs : il transformerait \S, \W, \B en \s, \w, \b
+const compile = (list = []) => list.map((p) => new RegExp(stripAccents(p), 'i'));
 
 const escapeHtml = (s) => String(s ?? '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]);
 
@@ -58,7 +60,7 @@ async function getApiKey() {
   const html = await (await fetchRetry(SITE + '/')).text();
   const m = html.match(/[,{]API_KEY:"([^"]+)"/);
   if (!m) throw new Error('API_KEY introuvable dans la page du site (structure changée ?)');
-  return JSON.parse(`"${m[1]}"`); // décode les /
+  return JSON.parse(`"${m[1]}"`); // décode les séquences \u échappées (ex. \u002F)
 }
 
 async function fetchAllOffers() {
@@ -74,13 +76,16 @@ async function fetchAllOffers() {
     const data = await res.json();
     const batch = data.result ?? data.results;
     if (!Array.isArray(batch)) throw new Error('Réponse API inattendue : pas de tableau "result"');
-    total = Number(data.count ?? 0);
+    // sans "count" exploitable, on s'arrête sur la première page incomplète
+    const count = Number(data.count);
+    total = Number.isFinite(count) && count > 0 ? count : Infinity;
     offers.push(...batch);
     if (batch.length < PAGE_SIZE) break;
   }
   if (offers.length === 0) throw new Error('0 offre renvoyée par l’API : on ne touche à rien');
-  if (offers.length < total) throw new Error(`Pagination incomplète : ${offers.length}/${total}`);
-  return offers;
+  if (Number.isFinite(total) && offers.length < total) throw new Error(`Pagination incomplète : ${offers.length}/${total}`);
+  // une offre publiée pendant la pagination décale les pages : dédoublonnage par id
+  return [...new Map(offers.map((o) => [String(o.id), o])).values()];
 }
 
 // ---------- filtre ----------
@@ -111,18 +116,22 @@ function highlights(o, patterns) {
 const frDate = (iso) =>
   iso ? new Date(iso.slice(0, 10) + 'T00:00:00Z').toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric', timeZone: 'UTC' }) : null;
 
+const offerUrl = (o) => `${SITE}/offres/${encodeURIComponent(o.id)}`;
+
+// tout ce qui vient de l'API est échappé : un "<" mal placé ferait refuser le message par Telegram
 function formatOffer(o, tags) {
+  const indemnite = Number(o.indemnite);
   const lines = [
     `<b>${escapeHtml(o.missionTitle)}</b>`,
     `🏢 ${escapeHtml(o.organizationName)}`,
     `📍 ${escapeHtml([o.cityName, o.countryName].filter(Boolean).join(', '))}`,
-    `⏱ ${o.missionDuration ?? '?'} mois` + (o.indemnite ? ` · 💶 ${Math.round(o.indemnite)} €/mois` : ''),
+    `⏱ ${escapeHtml(o.missionDuration ?? '?')} mois` + (indemnite > 0 ? ` · 💶 ${Math.round(indemnite)} €/mois` : ''),
   ];
   if (o.missionStartDate) lines.push(`🗓 Début de mission : ${frDate(o.missionStartDate)}`);
   if (tags.length) lines.push(`🧩 ${escapeHtml(tags.join(', '))}`);
   if (o.startBroadcastDate) lines.push(`📢 Date de publication : ${frDate(o.startBroadcastDate)}`);
   if (o.endBroadcastDate) lines.push(`⌛ Date d'expiration : ${frDate(o.endBroadcastDate)}`);
-  lines.push(`${SITE}/offres/${o.id}`);
+  lines.push(offerUrl(o));
   return lines.join('\n');
 }
 
@@ -189,7 +198,7 @@ async function main() {
   let sent = 0;
   try {
     for (const o of fresh) {
-      await notify(formatOffer(o, highlights(o, config.highlight ?? [])), `${SITE}/offres/${o.id}`);
+      await notify(formatOffer(o, highlights(o, config.highlight ?? [])), offerUrl(o));
       seen[o.id] = { title: o.missionTitle, at: now };
       sent++;
       await sleep(1100); // ~1 msg/s : limite Telegram pour un chat privé
