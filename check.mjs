@@ -6,13 +6,15 @@ const SITE = 'https://mon-vie-via.businessfrance.fr';
 const API = 'https://civiweb-api-prd.azurewebsites.net/api/Offers/search';
 const PAGE_SIZE = 100;          // l'API refuse au-delà
 const MAX_PAGES = 50;
-const MAX_NOTIFS = 25;          // au-delà : un message récapitulatif
 const PRUNE_DAYS = 180;
 const SEEN_FILE = new URL('./seen.json', import.meta.url);
 const CONFIG_FILE = new URL('./config.json', import.meta.url);
 
 const DRY_RUN = process.argv.includes('--dry-run');
-const { TELEGRAM_TOKEN, TELEGRAM_CHAT, NTFY_TOPIC, VIE_API_KEY } = process.env;
+// trim : un espace ou un retour à la ligne collé dans un secret GitHub suffit à tout casser
+const env = (k) => process.env[k]?.trim() || undefined;
+const [TELEGRAM_TOKEN, TELEGRAM_CHAT, NTFY_TOPIC, VIE_API_KEY] =
+  ['TELEGRAM_TOKEN', 'TELEGRAM_CHAT', 'NTFY_TOPIC', 'VIE_API_KEY'].map(env);
 
 // ---------- utilitaires ----------
 
@@ -105,6 +107,10 @@ function highlights(o, patterns) {
 
 // ---------- notifications ----------
 
+// "2026-12-01T00:00:00" -> "01 décembre 2026" (UTC pour ne pas décaler d'un jour selon le fuseau)
+const frDate = (iso) =>
+  iso ? new Date(iso.slice(0, 10) + 'T00:00:00Z').toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric', timeZone: 'UTC' }) : null;
+
 function formatOffer(o, tags) {
   const lines = [
     `<b>${escapeHtml(o.missionTitle)}</b>`,
@@ -112,8 +118,10 @@ function formatOffer(o, tags) {
     `📍 ${escapeHtml([o.cityName, o.countryName].filter(Boolean).join(', '))}`,
     `⏱ ${o.missionDuration ?? '?'} mois` + (o.indemnite ? ` · 💶 ${Math.round(o.indemnite)} €/mois` : ''),
   ];
-  if (o.missionStartDate) lines.push(`🗓 Début : ${o.missionStartDate.slice(0, 10)}`);
+  if (o.missionStartDate) lines.push(`🗓 Début de mission : ${frDate(o.missionStartDate)}`);
   if (tags.length) lines.push(`🧩 ${escapeHtml(tags.join(', '))}`);
+  if (o.startBroadcastDate) lines.push(`📢 Date de publication : ${frDate(o.startBroadcastDate)}`);
+  if (o.endBroadcastDate) lines.push(`⌛ Date d'expiration : ${frDate(o.endBroadcastDate)}`);
   lines.push(`${SITE}/offres/${o.id}`);
   return lines.join('\n');
 }
@@ -180,16 +188,11 @@ async function main() {
   const now = new Date().toISOString();
   let sent = 0;
   try {
-    for (const o of fresh.slice(0, MAX_NOTIFS)) {
+    for (const o of fresh) {
       await notify(formatOffer(o, highlights(o, config.highlight ?? [])), `${SITE}/offres/${o.id}`);
       seen[o.id] = { title: o.missionTitle, at: now };
       sent++;
-      await sleep(1100); // reste sous les limites Telegram
-    }
-    const rest = fresh.slice(MAX_NOTIFS);
-    if (rest.length) {
-      await notify(`<b>+${rest.length} autres offres VIE</b> correspondent :\n${SITE}/offres`);
-      for (const o of rest) seen[o.id] = { title: o.missionTitle, at: now };
+      await sleep(1100); // ~1 msg/s : limite Telegram pour un chat privé
     }
   } finally {
     // on n'enregistre que ce qui a vraiment été notifié ; le reste sera retenté au prochain run
