@@ -119,6 +119,7 @@ src/
   http.ts      fetch avec timeout, retry et masquage des secrets dans les logs
   text.ts      normalisation (accents, casse), échappement HTML, dates
   types.ts     types partagés (offre, config, seen.json, canaux)
+test/          tests unitaires (node:test)
 ```
 
 ## Développement
@@ -127,17 +128,18 @@ src/
 npm install
 npm run dry-run     # lance le bot sans rien envoyer
 npm run typecheck   # vérifie les types avec tsc
+npm test            # tests unitaires
 ```
 
-La CI (`.github/workflows/ci.yml`) lance le typecheck à chaque push et pull request.
+La CI (`.github/workflows/ci.yml`) lance le typecheck et les tests à chaque push et pull request.
 
 ## Stack
 
 | Élément | Utilisation |
 |---|---|
 | **TypeScript** | typage strict (`strict`, `noUncheckedIndexedAccess`), vérifié par `tsc` |
-| **Node.js 24** | exécution native du TypeScript, `fetch` natif |
-| **GitHub Actions** | exécution planifiée (`cron`) et CI (typecheck) |
+| **Node.js 24** | exécution native du TypeScript, `fetch` natif, tests avec `node:test` |
+| **GitHub Actions** | exécution planifiée (`cron`) et CI (typecheck + tests) |
 | **GitHub Secrets** | stockage du token et du chat id Telegram |
 | **Git** | sauvegarde de `seen.json` par un commit automatique |
 | **API Business France** | source des offres (`civiweb-api-prd.azurewebsites.net/api/Offers/search`), la même que celle utilisée par le site |
