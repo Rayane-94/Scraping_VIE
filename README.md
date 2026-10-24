@@ -1,148 +1,95 @@
 # vie-watcher
 
 [![ci](https://github.com/Rayane-94/Scraping_VIE/actions/workflows/ci.yml/badge.svg)](https://github.com/Rayane-94/Scraping_VIE/actions/workflows/ci.yml)
+![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white)
+![Node.js](https://img.shields.io/badge/Node.js-24-5fa04e?logo=nodedotjs&logoColor=white)
 
-Bot qui surveille les offres VIE de [mon-vie-via.businessfrance.fr](https://mon-vie-via.businessfrance.fr) et envoie sur Telegram les nouvelles offres qui correspondent à un profil.
+Bot open source qui surveille les offres VIE de [mon-vie-via.businessfrance.fr](https://mon-vie-via.businessfrance.fr) et envoie sur Telegram les nouvelles offres qui correspondent à **ton** profil.
 
-Le profil est entièrement réglable : métier, mots-clés, pays, technos. Il est configuré ici pour du développement full stack, mais il peut servir pour n'importe quel métier (finance, marketing, ingénierie…) en modifiant `config.json`.
+Il tourne gratuitement sur GitHub Actions, 3 fois par jour : pas de serveur, pas de PC allumé.
 
-Le bot tourne sur **GitHub Actions**, le service de GitHub qui exécute du code sur ses propres serveurs. Il se lance tout seul 3 fois par jour (6h, 12h, 18h UTC) : pas besoin de serveur ni de PC allumé.
+```
+Data Analyst (H/F)
+🏢 ACME
+📍 MONTREAL, CANADA
+⏱ 18 mois · 💶 3814 €/mois
+🗓 Début de mission : 01 janvier 2027
+🧩 python, sql, power bi
+📢 Date de publication : 23 octobre 2026
+⌛ Date d'expiration : 22 novembre 2026
+https://mon-vie-via.businessfrance.fr/offres/247434
+```
+
+## Adaptable à n'importe quel métier
+
+Ce repo est configuré pour du développement full stack, mais tout le ciblage se fait dans [`config.json`](config.json), sans toucher au code. Fork le projet, remplace les mots-clés, et le bot cherche pour toi : finance, marketing, ingénierie, commerce…
+
+```json
+{
+  "include": ["data (analyst|scientist|engineer)", "business intelligence", "\\bbi\\b"],
+  "exclude": ["stage"],
+  "countries": ["CA", "belgique"],
+  "highlight": ["python", "sql", "power ?bi", "tableau", "spark"]
+}
+```
+
+| Clé | Rôle |
+|---|---|
+| `include` | le titre doit contenir au moins un de ces mots |
+| `exclude` | titres à écarter |
+| `countries` | pays ciblés, `[]` pour tous |
+| `highlight` | compétences à repérer dans l'offre, affichées dans le message |
+
+Les mots-clés sont des regex, sans tenir compte des accents ni des majuscules. Telegram ne te convient pas ? Le bot peut aussi notifier via [ntfy](https://ntfy.sh).
 
 ## Installer son propre bot
 
-### 1. Récupérer le projet
+1. **Fork** ce repo, puis supprime `seen.json` (c'est l'historique des offres déjà envoyées me concernant, le bot la recrée tout seul).
+2. **Crée un bot Telegram** : sur [@BotFather](https://t.me/BotFather), envoie `/newbot` et note le token. Envoie un message à ton bot, puis ouvre `https://api.telegram.org/bot<TOKEN>/getUpdates` pour récupérer ton `chat.id`.
+3. **Ajoute les secrets** dans *Settings › Secrets and variables › Actions* : `TELEGRAM_TOKEN` et `TELEGRAM_CHAT` (ou `NTFY_TOPIC` pour ntfy).
+4. **Adapte `config.json`** à ton métier. Vérifie le résultat sans rien envoyer avec `npm run dry-run`.
+5. **Lance le bot** : sur un fork, GitHub désactive les Actions par défaut. Active-les dans l'onglet *Actions*, puis *vie-watcher › Run workflow*. Il tournera ensuite tout seul (horaires réglables dans [`vie.yml`](.github/workflows/vie.yml)).
 
-Créer un repo vide sur GitHub (sans README), puis :
+## Comment ça marche
 
-```bash
-git clone https://github.com/Rayane-94/Scraping_VIE.git vie-watcher
-cd vie-watcher
-git rm seen.json
-git commit -m "Reset seen.json"
-git remote set-url origin https://github.com/<ton-pseudo>/<ton-repo>.git
-git push -u origin main
+```mermaid
+flowchart LR
+    A[GitHub Actions<br/>3x/jour] --> B[API Business France]
+    B --> C[Filtre<br/>config.json]
+    C --> D{Déjà vue ?}
+    D -- non --> E[Telegram / ntfy]
+    E --> F[seen.json<br/>commité]
+    D -- oui --> G[ignorée]
 ```
 
-`seen.json` est la mémoire du bot (voir [Fonctionnement](#fonctionnement)). Celui du repo d'origine contient les offres déjà envoyées à son propriétaire : si on le garde, ces offres ne seront jamais envoyées. Il suffit de le supprimer, le bot le recrée tout seul au premier lancement.
+À chaque lancement, le bot récupère toutes les offres via l'API du site, filtre selon `config.json` et envoie celles qu'il n'a pas encore vues. La mémoire du bot (`seen.json`) est commitée dans le repo après chaque passage, d'où les commits `chore: maj seen.json`.
 
-### 2. Créer le bot Telegram
-
-1. Sur Telegram, ouvrir [@BotFather](https://t.me/BotFather) et envoyer `/newbot`.
-2. Choisir un nom, puis un identifiant qui finit par `bot`.
-3. BotFather renvoie un token (`123456789:AAH...`).
-4. Ouvrir la conversation avec **son** bot (lien `t.me/...` donné par BotFather), appuyer sur **Démarrer** et envoyer un message.
-5. Aller sur `https://api.telegram.org/bot<TOKEN>/getUpdates` et récupérer le nombre dans `"chat":{"id": ...}`.
-
-Si `getUpdates` renvoie `"result":[]`, c'est que le message a été envoyé à BotFather et pas au bot.
-
-### 3. Ajouter les secrets
-
-Dans le repo GitHub : **Settings › Secrets and variables › Actions › New repository secret**
-
-| Secret | Valeur |
-|---|---|
-| `TELEGRAM_TOKEN` | le token donné par BotFather |
-| `TELEGRAM_CHAT` | le chat id récupéré à l'étape précédente |
-
-### 4. Adapter `config.json` à son métier
-
-C'est le seul fichier à modifier pour changer le type d'offres reçues. Les filtres portent sur le **titre** de l'offre, sans tenir compte des majuscules ni des accents (écrire `developpeur`, pas `développeur`).
-
-| Clé | Rôle | Exemple |
-|---|---|---|
-| `include` | le titre doit contenir au moins un de ces mots | `"developpeu(r\|se)"`, `"devops"` |
-| `exclude` | les titres à écarter | `"business develop"`, `"sales"` |
-| `countries` | pays ciblés, `[]` pour tous | `["CA", "belgique"]` |
-| `highlight` | technos ou compétences recherchées dans la description, affichées dans le message | `"react"`, `"php"` |
-
-Exemple pour un profil contrôle de gestion :
-
-```json
-"include": ["controle(ur|use)? de gestion", "financial controller", "\\bfp&a\\b"],
-"exclude": ["stage"],
-"highlight": ["excel", "sap", "power ?bi"]
-```
-
-Pour vérifier la liste des offres retenues sans rien envoyer (Node.js 22.18 ou plus) :
-
-```bash
-npm run dry-run
-```
-
-Une fois satisfait, commiter et pousser `config.json`.
-
-### 5. Lancer le bot
-
-Sur GitHub, onglet **Actions** › **vie-watcher** › **Run workflow**.
-
-Ce premier lancement manuel envoie toutes les offres qui correspondent au profil. Ensuite, le bot tourne tout seul 3 fois par jour et n'envoie que les nouvelles offres.
-
-Pour changer les horaires, modifier la ligne `cron` dans `.github/workflows/vie.yml` (en heure UTC).
-
-## Fonctionnement
-
-À chaque lancement, `src/main.ts` :
-
-1. récupère toutes les offres publiées sur le site ;
-2. garde celles qui correspondent à `config.json` ;
-3. envoie sur Telegram celles qui ne sont pas encore dans `seen.json` ;
-4. ajoute les offres envoyées dans `seen.json`.
-
-### seen.json
-
-C'est la mémoire du bot : la liste des offres déjà envoyées, pour ne pas recevoir deux fois la même.
-
-GitHub Actions repart d'une machine vierge à chaque lancement : un fichier modifié pendant l'exécution est perdu à la fin. Le workflow commite donc `seen.json` dans le repo après chaque passage, pour que le lancement suivant le retrouve. Les commits `chore: maj seen.json` dans l'historique viennent de là.
-
-Il n'y a rien à faire dessus : ni le créer, ni le modifier. Le supprimer revient à tout renvoyer au prochain lancement.
-
-Si l'API ne répond pas ou renvoie une liste vide, rien n'est envoyé ni modifié. Une offre dont l'envoi a échoué n'est pas ajoutée à `seen.json` et sera renvoyée au passage suivant.
-
-## Notifications avec ntfy (alternative à Telegram)
-
-[ntfy.sh](https://ntfy.sh) envoie des notifications sur l'application mobile ntfy, sans créer de bot. Il suffit d'ajouter un secret `NTFY_TOPIC` (un nom difficile à deviner) et de s'abonner à ce topic dans l'application.
-
-L'usage de base est gratuit. ntfy propose aussi une offre payante (ntfy Pro) pour réserver son nom de topic et relever les limites d'envoi. Attention : un topic gratuit est public, toute personne qui connaît son nom peut lire les messages.
-
-## Structure du code
-
-Le code est en TypeScript. Node.js l'exécute directement (type stripping), sans étape de compilation : `tsc` sert uniquement à vérifier les types.
-
-```
-src/
-  main.ts      orchestration : config → offres → filtre → notifs → seen.json
-  vie.ts       client de l'API Business France (clé, pagination, dédoublonnage)
-  filter.ts    filtres include / exclude / pays et technos à mettre en avant
-  format.ts    mise en forme du message
-  notify.ts    envoi Telegram et ntfy
-  seen.ts      lecture, écriture atomique et purge de seen.json
-  http.ts      fetch avec timeout, retry et masquage des secrets dans les logs
-  text.ts      normalisation (accents, casse), échappement HTML, dates
-  types.ts     types partagés (offre, config, seen.json, canaux)
-test/          tests unitaires (node:test)
-```
+Quelques choix techniques :
+- **Pas de base de données** : l'état est versionné dans Git, ce qui suffit pour un job qui repart d'une machine vierge à chaque run.
+- **Aucune offre perdue** : une offre n'est marquée comme vue qu'une fois la notification envoyée.
+- **Fail-safe** : si l'API renvoie une réponse vide ou incomplète, le bot s'arrête sans rien modifier.
+- **Secrets masqués** dans les logs, visibles publiquement sur un repo open source.
 
 ## Développement
+
+TypeScript strict, exécuté nativement par Node.js 24 : aucune étape de build, aucune dépendance à l'exécution.
 
 ```bash
 npm install
 npm run dry-run     # lance le bot sans rien envoyer
-npm run typecheck   # vérifie les types avec tsc
+npm run typecheck   # vérifie les types
 npm test            # tests unitaires
 ```
 
-La CI (`.github/workflows/ci.yml`) lance le typecheck et les tests à chaque push et pull request.
+```
+src/
+  main.ts     orchestration
+  vie.ts      client de l'API Business France
+  filter.ts   filtrage selon config.json
+  format.ts   mise en forme du message
+  notify.ts   envoi Telegram et ntfy
+  seen.ts     mémoire des offres envoyées
+  http.ts     fetch avec timeout et retry
+```
 
-## Stack
-
-| Élément | Utilisation |
-|---|---|
-| **TypeScript** | typage strict (`strict`, `noUncheckedIndexedAccess`), vérifié par `tsc` |
-| **Node.js 24** | exécution native du TypeScript, `fetch` natif, tests avec `node:test` |
-| **GitHub Actions** | exécution planifiée (`cron`) et CI (typecheck + tests) |
-| **GitHub Secrets** | stockage du token et du chat id Telegram |
-| **Git** | sauvegarde de `seen.json` par un commit automatique |
-| **API Business France** | source des offres (`civiweb-api-prd.azurewebsites.net/api/Offers/search`), la même que celle utilisée par le site |
-| **Telegram Bot API** | envoi des messages (`sendMessage`, mise en forme HTML) |
-| **ntfy.sh** | canal de notification optionnel |
-| **JSON** | configuration (`config.json`) et mémoire (`seen.json`) |
+Les contributions sont les bienvenues : issue, idée ou pull request.
