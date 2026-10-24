@@ -1,5 +1,7 @@
 # vie-watcher
 
+[![ci](https://github.com/Rayane-94/Scraping_VIE/actions/workflows/ci.yml/badge.svg)](https://github.com/Rayane-94/Scraping_VIE/actions/workflows/ci.yml)
+
 Bot qui surveille les offres VIE de [mon-vie-via.businessfrance.fr](https://mon-vie-via.businessfrance.fr) et envoie sur Telegram les nouvelles offres qui correspondent à un profil.
 
 Le profil est entièrement réglable : métier, mots-clés, pays, technos. Il est configuré ici pour du développement full stack, mais il peut servir pour n'importe quel métier (finance, marketing, ingénierie…) en modifiant `config.json`.
@@ -61,10 +63,10 @@ Exemple pour un profil contrôle de gestion :
 "highlight": ["excel", "sap", "power ?bi"]
 ```
 
-Pour vérifier la liste des offres retenues sans rien envoyer :
+Pour vérifier la liste des offres retenues sans rien envoyer (Node.js 22.18 ou plus) :
 
 ```bash
-node check.mjs --dry-run
+npm run dry-run
 ```
 
 Une fois satisfait, commiter et pousser `config.json`.
@@ -79,7 +81,7 @@ Pour changer les horaires, modifier la ligne `cron` dans `.github/workflows/vie.
 
 ## Fonctionnement
 
-À chaque lancement, `check.mjs` :
+À chaque lancement, `src/main.ts` :
 
 1. récupère toutes les offres publiées sur le site ;
 2. garde celles qui correspondent à `config.json` ;
@@ -102,12 +104,40 @@ Si l'API ne répond pas ou renvoie une liste vide, rien n'est envoyé ni modifi�
 
 L'usage de base est gratuit. ntfy propose aussi une offre payante (ntfy Pro) pour réserver son nom de topic et relever les limites d'envoi. Attention : un topic gratuit est public, toute personne qui connaît son nom peut lire les messages.
 
+## Structure du code
+
+Le code est en TypeScript. Node.js l'exécute directement (type stripping), sans étape de compilation : `tsc` sert uniquement à vérifier les types.
+
+```
+src/
+  main.ts      orchestration : config → offres → filtre → notifs → seen.json
+  vie.ts       client de l'API Business France (clé, pagination, dédoublonnage)
+  filter.ts    filtres include / exclude / pays et technos à mettre en avant
+  format.ts    mise en forme du message
+  notify.ts    envoi Telegram et ntfy
+  seen.ts      lecture, écriture atomique et purge de seen.json
+  http.ts      fetch avec timeout, retry et masquage des secrets dans les logs
+  text.ts      normalisation (accents, casse), échappement HTML, dates
+  types.ts     types partagés (offre, config, seen.json, canaux)
+```
+
+## Développement
+
+```bash
+npm install
+npm run dry-run     # lance le bot sans rien envoyer
+npm run typecheck   # vérifie les types avec tsc
+```
+
+La CI (`.github/workflows/ci.yml`) lance le typecheck à chaque push et pull request.
+
 ## Stack
 
 | Élément | Utilisation |
 |---|---|
-| **Node.js 22** | exécution du script (modules ESM, `fetch` natif) | |
-| **GitHub Actions** | exécution planifiée (`cron`) sur `ubuntu-latest`, avec `actions/checkout@v4` et `actions/setup-node@v4` |
+| **TypeScript** | typage strict (`strict`, `noUncheckedIndexedAccess`), vérifié par `tsc` |
+| **Node.js 24** | exécution native du TypeScript, `fetch` natif |
+| **GitHub Actions** | exécution planifiée (`cron`) et CI (typecheck) |
 | **GitHub Secrets** | stockage du token et du chat id Telegram |
 | **Git** | sauvegarde de `seen.json` par un commit automatique |
 | **API Business France** | source des offres (`civiweb-api-prd.azurewebsites.net/api/Offers/search`), la même que celle utilisée par le site |
