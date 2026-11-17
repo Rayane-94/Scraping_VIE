@@ -46,9 +46,9 @@ describe('fetchRetry', () => {
 
   it('masque le token Telegram dans le message d’erreur', async () => {
     mockFetch(async () => new Response('', { status: 502 }));
-    const err = await fetchRetry('https://api.telegram.org/bot123:SECRET/sendMessage', {}, { retries: 1 }).catch(
-      (e: unknown) => e as Error,
-    );
-    assert.doesNotMatch(err.message, /SECRET/);
+    await assert.rejects(fetchRetry('https://api.telegram.org/bot123:SECRET/sendMessage', {}, { retries: 1 }), (err: Error) => {
+      assert.doesNotMatch(err.message, /SECRET/);
+      return true;
+    });
   });
 });
