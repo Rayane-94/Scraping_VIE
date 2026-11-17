@@ -2,7 +2,9 @@ name: vie-watcher
 
 on:
   schedule:
-    - cron: '0 6,12,18 * * *' # UTC
+    # toutes les 5 min (minimum autorisé par GitHub), décalé de l'heure pile où GitHub est saturé.
+    # Le cron GitHub reste « au mieux » : des runs peuvent être retardés ou sautés aux heures chargées
+    - cron: '2-59/5 * * * *'
   workflow_dispatch:
 
 permissions:

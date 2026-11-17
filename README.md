@@ -6,7 +6,7 @@
 
 Bot open source qui surveille les offres VIE de [mon-vie-via.businessfrance.fr](https://mon-vie-via.businessfrance.fr) et envoie sur Telegram les nouvelles offres qui correspondent à **ton** profil.
 
-Il tourne gratuitement sur GitHub Actions, 3 fois par jour : pas de serveur, pas de PC allumé.
+Il tourne gratuitement sur GitHub Actions, toutes les 5 minutes : pas de serveur, pas de PC allumé.
 
 ```
 Data Analyst (H/F)
@@ -54,7 +54,7 @@ Les mots-clés sont des regex, sans tenir compte des accents ni des majuscules. 
 
 ```mermaid
 flowchart LR
-    A[GitHub Actions<br/>3x/jour] --> B[API Business France]
+    A[GitHub Actions<br/>toutes les 5 min] --> B[API Business France]
     B --> C[Filtre<br/>config.json]
     C --> D{Déjà vue ?}
     D -- non --> E[Telegram / ntfy]
