@@ -3,7 +3,7 @@
 import { readFile } from 'node:fs/promises';
 import { makeFilter, highlights } from './filter.ts';
 import { formatOffer } from './format.ts';
-import { sleep } from './http.ts';
+import { sleep, TransientError } from './http.ts';
 import { notify } from './notify.ts';
 import { loadSeen, pruneSeen, saveSeen } from './seen.ts';
 import { toPlain } from './text.ts';
@@ -64,6 +64,12 @@ async function main(): Promise<void> {
 }
 
 main().catch((err: Error) => {
+  if (err instanceof TransientError) {
+    // panne passagère du site ou de Telegram : rien n'a été perdu (seen.json n'enregistre que les envois réussis)
+    // et le run suivant réessaiera. Un avertissement plutôt qu'un échec évite un email GitHub toutes les 5 min.
+    console.log(`::warning::${err.message}`);
+    return;
+  }
   const cause = err.cause as { code?: string; message?: string } | undefined;
   console.error('ERREUR :', err.message, cause?.code ?? cause?.message ?? '');
   process.exit(1);

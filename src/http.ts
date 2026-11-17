@@ -4,6 +4,12 @@ export const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeou
 export const maskUrl = (url: string): string =>
   url.replace(/\/bot[^/]+/, '/bot***').replace(/ntfy\.sh\/.+/, 'ntfy.sh/***');
 
+// Service distant indisponible (réseau, timeout, 5xx, 429) malgré les retries :
+// ce n'est pas un bug de notre côté, le run suivant réessaiera.
+export class TransientError extends Error {
+  override name = 'TransientError';
+}
+
 interface RetryOptions {
   retries?: number;
   timeout?: number;
@@ -25,10 +31,13 @@ export async function fetchRetry(
     if (res?.ok) return res;
     if (res) {
       const body = await res.text().catch(() => '');
-      lastErr = new Error(`HTTP ${res.status} sur ${maskUrl(url)} ${body.slice(0, 200)}`);
-      if (res.status < 500 && res.status !== 429) break; // 4xx : inutile de réessayer
+      const message = `HTTP ${res.status} sur ${maskUrl(url)} ${body.slice(0, 200)}`;
+      // 4xx : requête refusée (clé, token, URL…), inutile de réessayer, c'est à corriger
+      if (res.status < 500 && res.status !== 429) throw new Error(message);
+      lastErr = new Error(message);
     }
     if (attempt < retries) await sleep(2 ** attempt * 1000);
   }
-  throw lastErr;
+  const reason = lastErr instanceof Error ? lastErr.message : String(lastErr);
+  throw new TransientError(`${maskUrl(url)} injoignable après ${retries} tentative(s) : ${reason}`, { cause: lastErr });
 }
